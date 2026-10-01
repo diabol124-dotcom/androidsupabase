@@ -2,12 +2,15 @@ package com.example.std
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,31 +25,43 @@ fun StudentList(
     students: List<StudentItem>,
     groupMap: Map<Int, String>,
     onEditStudent: (StudentItem) -> Unit,
-    onDeleteStudent: (Int) -> Unit
+    onDeleteStudent: (Int) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
-    LazyColumn(
+    // Adaptive: на телефоне получается 1 колонка, на планшете/в ландшафте - 2, 3 и т.д.
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 340.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item {
-            Text(
-                text = "Студенты (${students.size})",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-            )
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Студенты (${students.size})",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Default.Settings, contentDescription = "Настройки")
+                }
+            }
         }
 
-        items(students) { student ->
+        // key = id: Compose понимает, какая карточка какая, и не перерисовывает лишнее
+        items(students, key = { it.id }) { student ->
             val gName = student.group_id?.let { groupMap[it] } ?: "не указана"
             val bDate = student.birth_date ?: "не указан"
             val initials = "${student.first_name.firstOrNull() ?: ""}${student.last_name.firstOrNull() ?: ""}"
             var menuExpanded by remember { mutableStateOf(false) }
 
             Card(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
+                modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {

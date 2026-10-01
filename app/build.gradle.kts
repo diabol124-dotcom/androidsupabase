@@ -60,6 +60,7 @@ dependencies {
     // Supabase
     implementation(platform(libs.supabase.bom))
     implementation(libs.postgrest.kt)
+    implementation("io.github.jan-tennert.supabase:storage-kt")
 
     // Ktor (Исправлено на точки согласно генерации Gradle)
     implementation(libs.ktor.client.core)

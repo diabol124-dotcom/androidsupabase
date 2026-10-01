@@ -1,10 +1,12 @@
 package com.example.std
 
 import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.storage.storage
+import io.ktor.http.ContentType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import java.util.UUID
 
 @Serializable
 data class StudentItem(
@@ -39,6 +41,8 @@ data class GroupResponse(val id: Int, val name: String)
 
 object StudentRepository {
 
+    private const val AVATAR_BUCKET = "avatars"
+
     suspend fun getAllStudents(): List<StudentItem> = withContext(Dispatchers.IO) {
         SupabaseClient.instance.from("students").select().decodeList()
     }
@@ -47,7 +51,7 @@ object StudentRepository {
         SupabaseClient.instance.from("groups").select().decodeList()
     }
 
-    // ИСПРАВЛЕНО: Запрашиваем возврат созданной строки (select), чтобы не было ошибки EOF
+    // Запрашиваем возврат созданной строки (select), чтобы не было ошибки EOF
     suspend fun insertStudent(student: StudentInsert) = withContext(Dispatchers.IO) {
         SupabaseClient.instance.from("students").insert(student) {
             select()
@@ -68,7 +72,6 @@ object StudentRepository {
         }
     }
 
-    // ИСПРАВЛЕНО: Также добавили select(), чтобы метод обновления не падал из-за EOF
     suspend fun updateStudent(studentId: Int, student: StudentInsert) = withContext(Dispatchers.IO) {
         SupabaseClient.instance.from("students").update(student) {
             filter {
@@ -76,5 +79,19 @@ object StudentRepository {
             }
             select()
         }
+    }
+
+    /**
+     * Загружает картинку в Supabase Storage (бакет "avatars")
+     * и возвращает публичную ссылку, которая и пишется в students.avatar_url.
+     */
+    suspend fun uploadAvatar(bytes: ByteArray): String = withContext(Dispatchers.IO) {
+        val path = "${UUID.randomUUID()}.jpg"
+        val bucket = SupabaseClient.instance.storage.from(AVATAR_BUCKET)
+        bucket.upload(path, bytes) {
+            upsert = false
+            contentType = ContentType.Image.JPEG
+        }
+        bucket.publicUrl(path)
     }
 }
