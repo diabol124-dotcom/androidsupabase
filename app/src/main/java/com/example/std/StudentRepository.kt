@@ -18,11 +18,40 @@ data class StudentItem(
     val avatar_url: String? = null
 )
 
+// curator_id - если в таблице groups есть такая колонка
 @Serializable
 data class GroupItem(
     val id: Int,
-    val name: String
+    val name: String,
+    val curator_id: Int? = null
 )
+
+// Все поля кроме id необязательные: подойдет любая схема таблицы
+@Serializable
+data class CuratorItem(
+    val id: Int,
+    val first_name: String? = null,
+    val last_name: String? = null,
+    val middle_name: String? = null,
+    val patronymic: String? = null,
+    val name: String? = null,
+    val full_name: String? = null,
+    val fio: String? = null,
+    val group_id: Int? = null
+) {
+    val displayName: String
+        get() {
+            val parts = listOfNotNull(
+                last_name,
+                first_name,
+                middle_name ?: patronymic
+            ).filter { it.isNotBlank() }
+            if (parts.isNotEmpty()) return parts.joinToString(" ")
+            val single = listOfNotNull(full_name, fio, name)
+                .firstOrNull { it.isNotBlank() }
+            return single ?: "Куратор №$id"
+        }
+}
 
 @Serializable
 data class StudentInsert(
@@ -43,55 +72,74 @@ object StudentRepository {
 
     private const val AVATAR_BUCKET = "avatars"
 
-    suspend fun getAllStudents(): List<StudentItem> = withContext(Dispatchers.IO) {
-        SupabaseClient.instance.from("students").select().decodeList()
-    }
-
-    suspend fun getAllGroups(): List<GroupItem> = withContext(Dispatchers.IO) {
-        SupabaseClient.instance.from("groups").select().decodeList()
-    }
-
-    // Запрашиваем возврат созданной строки (select), чтобы не было ошибки EOF
-    suspend fun insertStudent(student: StudentInsert) = withContext(Dispatchers.IO) {
-        SupabaseClient.instance.from("students").insert(student) {
-            select()
+    suspend fun getAllStudents(): List<StudentItem> =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("students").select()
+                .decodeList()
         }
-    }
 
-    suspend fun insertGroup(group: GroupInsert): GroupResponse = withContext(Dispatchers.IO) {
-        SupabaseClient.instance.from("groups").insert(group) {
-            select()
-        }.decodeSingle()
-    }
+    suspend fun getAllGroups(): List<GroupItem> =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("groups").select()
+                .decodeList()
+        }
 
-    suspend fun deleteStudent(studentId: Int) = withContext(Dispatchers.IO) {
-        SupabaseClient.instance.from("students").delete {
-            filter {
-                eq("id", studentId)
+    suspend fun getAllCurators(): List<CuratorItem> =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("curators").select()
+                .decodeList()
+        }
+
+    // select() - чтобы сервер вернул строку и не было ошибки EOF
+    suspend fun insertStudent(student: StudentInsert) =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("students")
+                .insert(student) {
+                    select()
+                }
+        }
+
+    suspend fun insertGroup(group: GroupInsert): GroupResponse =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("groups")
+                .insert(group) {
+                    select()
+                }.decodeSingle()
+        }
+
+    suspend fun deleteStudent(studentId: Int) =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("students").delete {
+                filter {
+                    eq("id", studentId)
+                }
             }
         }
-    }
 
-    suspend fun updateStudent(studentId: Int, student: StudentInsert) = withContext(Dispatchers.IO) {
-        SupabaseClient.instance.from("students").update(student) {
-            filter {
-                eq("id", studentId)
-            }
-            select()
+    suspend fun updateStudent(studentId: Int, student: StudentInsert) =
+        withContext(Dispatchers.IO) {
+            SupabaseClient.instance.from("students")
+                .update(student) {
+                    filter {
+                        eq("id", studentId)
+                    }
+                    select()
+                }
         }
-    }
 
     /**
-     * Загружает картинку в Supabase Storage (бакет "avatars")
-     * и возвращает публичную ссылку, которая и пишется в students.avatar_url.
+     * Грузит картинку в Storage (бакет "avatars")
+     * и возвращает публичную ссылку для students.avatar_url.
      */
-    suspend fun uploadAvatar(bytes: ByteArray): String = withContext(Dispatchers.IO) {
-        val path = "${UUID.randomUUID()}.jpg"
-        val bucket = SupabaseClient.instance.storage.from(AVATAR_BUCKET)
-        bucket.upload(path, bytes) {
-            upsert = false
-            contentType = ContentType.Image.JPEG
+    suspend fun uploadAvatar(bytes: ByteArray): String =
+        withContext(Dispatchers.IO) {
+            val path = "${UUID.randomUUID()}.jpg"
+            val bucket = SupabaseClient.instance.storage
+                .from(AVATAR_BUCKET)
+            bucket.upload(path, bytes) {
+                upsert = false
+                contentType = ContentType.Image.JPEG
+            }
+            bucket.publicUrl(path)
         }
-        bucket.publicUrl(path)
-    }
 }

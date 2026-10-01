@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -25,7 +26,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val context = LocalContext.current
-            var themeSettings by remember { mutableStateOf(ThemeStore.load(context)) }
+            var themeSettings by remember {
+                mutableStateOf(ThemeStore.load(context))
+            }
 
             AppTheme(themeSettings) {
                 MainScreen(
@@ -46,18 +49,37 @@ fun MainScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Экраны: login, register, list, dev, groups, profile (вкладки), form, settings
+    // Экраны: login, register, form, settings, groupDetail
+    // Вкладки: list, groups, curators, profile
     var screenState by remember { mutableStateOf("login") }
     var settingsBackTo by remember { mutableStateOf("list") }
+    var selectedGroupId by remember { mutableStateOf(-1) }
     var currentUser by remember { mutableStateOf("") }
 
-    var students by remember { mutableStateOf<List<StudentItem>>(emptyList()) }
-    var groupMap by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var students by remember {
+        mutableStateOf<List<StudentItem>>(emptyList())
+    }
+    var groups by remember {
+        mutableStateOf<List<GroupItem>>(emptyList())
+    }
+    var curators by remember {
+        mutableStateOf<List<CuratorItem>>(emptyList())
+    }
+    var curatorsFailed by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var isThemeBusy by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var editingStudent by remember { mutableStateOf<StudentItem?>(null) }
+    var editingStudent by remember {
+        mutableStateOf<StudentItem?>(null)
+    }
+
+    val groupMap = remember(groups) {
+        groups.associate { it.id to it.name }
+    }
+    val groupInfos = remember(groups, curators, students) {
+        buildGroupInfos(groups, curators, students)
+    }
 
     // Широкий экран (планшет): вместо нижней панели - боковая
     val isWide = LocalConfiguration.current.screenWidthDp >= 720
@@ -67,16 +89,32 @@ fun MainScreen(
         errorMessage = null
         scope.launch {
             try {
-                // Группы и студенты грузятся ПАРАЛЛЕЛЬНО (раньше - по очереди)
+                // Все таблицы грузятся параллельно
                 coroutineScope {
-                    val groupsDeferred = async { StudentRepository.getAllGroups() }
-                    val studentsDeferred = async { StudentRepository.getAllStudents() }
-                    groupMap = groupsDeferred.await().associate { it.id to it.name }
-                    students = studentsDeferred.await()
+                    val groupsJob = async {
+                        StudentRepository.getAllGroups()
+                    }
+                    val studentsJob = async {
+                        StudentRepository.getAllStudents()
+                    }
+                    // Кураторы не должны ломать основной экран,
+                    // поэтому их ошибка перехватывается отдельно
+                    val curatorsJob = async {
+                        runCatching { StudentRepository.getAllCurators() }
+                    }
+                    groups = groupsJob.await()
+                    students = studentsJob.await()
+                    val result = curatorsJob.await()
+                    curators = result.getOrDefault(emptyList())
+                    curatorsFailed = result.isFailure
+                    result.exceptionOrNull()?.let {
+                        Log.e("AppError", "Кураторы: ${it.message}", it)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("AppError", "Ошибка загрузки: ${e.message}", e)
-                errorMessage = "Нет сети или ошибка базы данных. Проверьте RLS в Supabase."
+                errorMessage = "Нет сети или ошибка базы данных. " +
+                        "Проверьте RLS в Supabase."
             } finally {
                 isLoading = false
             }
@@ -87,11 +125,17 @@ fun MainScreen(
         scope.launch {
             try {
                 StudentRepository.deleteStudent(id)
-                // Убираем из списка локально - без лишнего запроса к серверу
+                // Убираем из списка локально, без лишнего запроса
                 students = students.filterNot { it.id == id }
-                Toast.makeText(context, "Студент удален", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context, "Студент удален", Toast.LENGTH_SHORT
+                ).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "Ошибка удаления: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "Ошибка удаления: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
@@ -101,24 +145,31 @@ fun MainScreen(
         isSaving = true
         scope.launch {
             try {
-                // Если выбрали новую картинку - сжимаем, грузим в Storage и берем URL
+                // Новая картинка: сжимаем, грузим в Storage, берем URL
                 var avatarUrl = studentInsert.avatar_url
                 if (newImageUri != null) {
                     val bytes = prepareAvatarBytes(context, newImageUri)
                     avatarUrl = StudentRepository.uploadAvatar(bytes)
                 }
 
-                val finalStudentData = studentInsert.copy(
-                    birth_date = studentInsert.birth_date?.trim()?.ifBlank { null },
+                val finalData = studentInsert.copy(
+                    birth_date = studentInsert.birth_date
+                        ?.trim()?.ifBlank { null },
                     avatar_url = avatarUrl?.trim()?.ifBlank { null }
                 )
 
                 if (editingStudent == null) {
-                    StudentRepository.insertStudent(finalStudentData)
-                    Toast.makeText(context, "Студент добавлен", Toast.LENGTH_SHORT).show()
+                    StudentRepository.insertStudent(finalData)
+                    Toast.makeText(
+                        context, "Студент добавлен", Toast.LENGTH_SHORT
+                    ).show()
                 } else {
-                    StudentRepository.updateStudent(editingStudent!!.id, finalStudentData)
-                    Toast.makeText(context, "Данные изменены", Toast.LENGTH_SHORT).show()
+                    StudentRepository.updateStudent(
+                        editingStudent!!.id, finalData
+                    )
+                    Toast.makeText(
+                        context, "Данные изменены", Toast.LENGTH_SHORT
+                    ).show()
                 }
 
                 students = StudentRepository.getAllStudents()
@@ -126,7 +177,11 @@ fun MainScreen(
                 screenState = "list"
             } catch (e: Exception) {
                 Log.e("AppError", "Ошибка сохранения: ${e.message}", e)
-                Toast.makeText(context, "Ошибка сохранения: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "Ошибка сохранения: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             } finally {
                 isSaving = false
             }
@@ -134,7 +189,9 @@ fun MainScreen(
     }
 
     fun handleThemeMode(mode: ThemeMode) {
-        onThemeSettingsChange(ThemeStore.saveMode(context, themeSettings, mode))
+        onThemeSettingsChange(
+            ThemeStore.saveMode(context, themeSettings, mode)
+        )
     }
 
     fun handlePickBackground(uri: Uri) {
@@ -142,10 +199,16 @@ fun MainScreen(
         isThemeBusy = true
         scope.launch {
             try {
-                onThemeSettingsChange(ThemeStore.saveCustomImage(context, themeSettings, uri))
+                onThemeSettingsChange(
+                    ThemeStore.saveCustomImage(context, themeSettings, uri)
+                )
             } catch (e: Exception) {
                 Log.e("AppError", "Ошибка темы: ${e.message}", e)
-                Toast.makeText(context, "Не удалось установить фон: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "Не удалось установить фон: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             } finally {
                 isThemeBusy = false
             }
@@ -155,19 +218,27 @@ fun MainScreen(
     fun handleLogout() {
         currentUser = ""
         students = emptyList()
-        groupMap = emptyMap()
+        groups = emptyList()
+        curators = emptyList()
+        curatorsFailed = false
         editingStudent = null
         screenState = "login"
     }
 
-    // Системная кнопка "назад": форма -> список, настройки -> откуда пришли, другие вкладки -> главная
-    BackHandler(enabled = screenState == "form" || screenState == "settings" || (isMainTab(screenState) && screenState != "list")) {
+    // Системная кнопка "назад"
+    val backEnabled = screenState == "form" ||
+            screenState == "settings" ||
+            screenState == "groupDetail" ||
+            (isMainTab(screenState) && screenState != "list")
+
+    BackHandler(enabled = backEnabled) {
         when (screenState) {
             "form" -> if (!isSaving) {
                 editingStudent = null
                 screenState = "list"
             }
             "settings" -> screenState = settingsBackTo
+            "groupDetail" -> screenState = "curators"
             else -> screenState = "list"
         }
     }
@@ -188,7 +259,10 @@ fun MainScreen(
     }
 
     if (isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
             CircularProgressIndicator()
         }
         return
@@ -229,6 +303,18 @@ fun MainScreen(
             }
         )
 
+        screenState == "groupDetail" -> {
+            val info = groupInfos.firstOrNull { it.id == selectedGroupId }
+            if (info != null) {
+                GroupDetailScreen(
+                    info = info,
+                    onBack = { screenState = "curators" }
+                )
+            } else {
+                LaunchedEffect(Unit) { screenState = "curators" }
+            }
+        }
+
         isMainTab(screenState) -> {
             // Содержимое выбранной вкладки
             val tabContent: @Composable () -> Unit = {
@@ -240,18 +326,32 @@ fun MainScreen(
                             editingStudent = student
                             screenState = "form"
                         },
-                        onDeleteStudent = { id -> handleDeleteStudent(id) },
+                        onDeleteStudent = { id ->
+                            handleDeleteStudent(id)
+                        },
                         onOpenSettings = {
                             settingsBackTo = "list"
                             screenState = "settings"
                         }
                     )
-                    "dev" -> DevelopmentScreen()
-                    "groups" -> GroupsScreen(students = students, groupMap = groupMap)
+                    "groups" -> GroupsScreen(
+                        infos = groupInfos,
+                        students = students
+                    )
+                    "curators" -> CuratorsScreen(
+                        curators = curators,
+                        infos = groupInfos,
+                        loadFailed = curatorsFailed,
+                        onOpenGroup = { id ->
+                            selectedGroupId = id
+                            screenState = "groupDetail"
+                        }
+                    )
                     "profile" -> ProfileScreen(
                         username = currentUser,
                         studentsCount = students.size,
-                        groupsCount = groupMap.size,
+                        groupsCount = groups.size,
+                        curatorsCount = curators.size,
                         onOpenSettings = {
                             settingsBackTo = "profile"
                             screenState = "settings"
@@ -267,7 +367,11 @@ fun MainScreen(
                         editingStudent = null
                         screenState = "form"
                     }) {
-                        Text("+", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            "+",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -275,23 +379,39 @@ fun MainScreen(
             if (isWide) {
                 // Планшет: боковая панель слева
                 Row(modifier = Modifier.fillMaxSize()) {
-                    AppNavigationRail(current = screenState, onSelect = { screenState = it })
+                    AppNavigationRail(
+                        current = screenState,
+                        onSelect = { screenState = it }
+                    )
                     Scaffold(
                         modifier = Modifier.weight(1f),
                         containerColor = Color.Transparent,
                         floatingActionButton = fab
                     ) { padding ->
-                        Box(modifier = Modifier.fillMaxSize().padding(padding)) { tabContent() }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                        ) { tabContent() }
                     }
                 }
             } else {
                 // Телефон: нижняя панель
                 Scaffold(
                     containerColor = Color.Transparent,
-                    bottomBar = { AppNavigationBar(current = screenState, onSelect = { screenState = it }) },
+                    bottomBar = {
+                        AppNavigationBar(
+                            current = screenState,
+                            onSelect = { screenState = it }
+                        )
+                    },
                     floatingActionButton = fab
                 ) { padding ->
-                    Box(modifier = Modifier.fillMaxSize().padding(padding)) { tabContent() }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                    ) { tabContent() }
                 }
             }
         }

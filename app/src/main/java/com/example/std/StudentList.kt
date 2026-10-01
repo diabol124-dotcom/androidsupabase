@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
@@ -28,7 +29,7 @@ fun StudentList(
     onDeleteStudent: (Int) -> Unit,
     onOpenSettings: () -> Unit
 ) {
-    // Adaptive: на телефоне получается 1 колонка, на планшете/в ландшафте - 2, 3 и т.д.
+    // Телефон - 1 колонка, планшет / ландшафт - 2, 3 и т.д.
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 340.dp),
         modifier = Modifier.fillMaxSize(),
@@ -44,25 +45,32 @@ fun StudentList(
                 Text(
                     text = "Студенты (${students.size})",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = "Настройки")
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "Настройки"
+                    )
                 }
             }
         }
 
-        // key = id: Compose понимает, какая карточка какая, и не перерисовывает лишнее
+        // key = id: Compose не перерисовывает лишние карточки
         items(students, key = { it.id }) { student ->
-            val gName = student.group_id?.let { groupMap[it] } ?: "не указана"
+            val gName = student.group_id?.let { groupMap[it] }
+                ?: "не указана"
             val bDate = student.birth_date ?: "не указан"
-            val initials = "${student.first_name.firstOrNull() ?: ""}${student.last_name.firstOrNull() ?: ""}"
+            val initials = "${student.first_name.firstOrNull() ?: ""}" +
+                    "${student.last_name.firstOrNull() ?: ""}"
             var menuExpanded by remember { mutableStateOf(false) }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = 2.dp
+                ),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
@@ -74,34 +82,61 @@ fun StudentList(
                         AsyncImage(
                             model = student.avatar_url,
                             contentDescription = "Аватар",
-                            modifier = Modifier.size(56.dp).clip(CircleShape),
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     } else {
                         Box(
-                            modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    MaterialTheme.colorScheme
+                                        .primaryContainer
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 initials.uppercase(),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                style = MaterialTheme.typography
+                                    .titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme
+                                    .onPrimaryContainer
                             )
                         }
                     }
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("${student.first_name} ${student.last_name}", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            "${student.first_name} ${student.last_name}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text("День рождения: $bDate", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Группа: $gName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "День рождения: $bDate",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme
+                                .onSurfaceVariant
+                        )
+                        Text(
+                            "Группа: $gName",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme
+                                .onSurfaceVariant
+                        )
                     }
 
                     // Троеточие действий
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Меню")
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Меню"
+                            )
                         }
                         DropdownMenu(
                             expanded = menuExpanded,
@@ -115,7 +150,13 @@ fun StudentList(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Удалить", color = MaterialTheme.colorScheme.error) },
+                                text = {
+                                    Text(
+                                        "Удалить",
+                                        color = MaterialTheme
+                                            .colorScheme.error
+                                    )
+                                },
                                 onClick = {
                                     menuExpanded = false
                                     onDeleteStudent(student.id)

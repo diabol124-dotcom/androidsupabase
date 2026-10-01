@@ -19,6 +19,7 @@ fun ProfileScreen(
     username: String,
     studentsCount: Int,
     groupsCount: Int,
+    curatorsCount: Int,
     onOpenSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -28,25 +29,39 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             title = { Text("Выйти из аккаунта?") },
-            text = { Text("Чтобы продолжить работу, нужно будет снова войти.") },
+            text = {
+                Text("Чтобы продолжить, нужно будет снова войти.")
+            },
             confirmButton = {
                 TextButton(onClick = {
                     showLogoutDialog = false
                     onLogout()
-                }) { Text("Выйти", color = MaterialTheme.colorScheme.error) }
+                }) {
+                    Text(
+                        "Выйти",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("Отмена") }
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Отмена")
+                }
             }
         )
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Column(
-            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(28.dp),
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -62,7 +77,8 @@ fun ProfileScreen(
                         username.take(1).uppercase().ifBlank { "?" },
                         style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme
+                            .onPrimaryContainer
                     )
                 }
             }
@@ -82,10 +98,11 @@ fun ProfileScreen(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 StatCard("Студентов", studentsCount, Modifier.weight(1f))
                 StatCard("Групп", groupsCount, Modifier.weight(1f))
+                StatCard("Кураторов", curatorsCount, Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -94,7 +111,11 @@ fun ProfileScreen(
                 onClick = onOpenSettings,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Настройки")
             }
@@ -114,7 +135,11 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
+private fun StatCard(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier
+) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
@@ -132,7 +157,7 @@ private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
             )
             Text(
                 label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

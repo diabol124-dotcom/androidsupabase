@@ -7,17 +7,21 @@ import io.github.jan.supabase.storage.Storage
 import kotlinx.serialization.json.Json
 
 object SupabaseClient {
+    private const val URL =
+        "https://qxjtsvzabzumbbtetsdi.supabase.co"
+    private const val KEY =
+        "sb_publishable_EMDNixt664-vkbALidgxDg_gdrVmmsd"
+
     val instance = createSupabaseClient(
-        supabaseUrl = "https://qxjtsvzabzumbbtetsdi.supabase.co",
-        supabaseKey = "sb_publishable_EMDNixt664-vkbALidgxDg_gdrVmmsd"
+        supabaseUrl = URL,
+        supabaseKey = KEY
     ) {
-        // Установка модуля работы с базой данных Postgrest
+        // База данных
         install(Postgrest)
 
-        // Хранилище файлов (для аватарок)
+        // Хранилище файлов (аватарки студентов)
         install(Storage)
 
-        // ПРАВИЛЬНО: Передаем конфигурацию Json через встроенный KotlinXSerializer библиотеки
         defaultSerializer = KotlinXSerializer(Json {
             ignoreUnknownKeys = true
             encodeDefaults = true

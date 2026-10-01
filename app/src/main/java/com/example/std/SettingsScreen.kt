@@ -30,17 +30,27 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
         if (uri != null) onPickBackground(uri)
     }
     fun launchPicker() {
-        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        picker.launch(
+            PickVisualMediaRequest(
+                ActivityResultContracts.PickVisualMedia.ImageOnly
+            )
+        )
     }
 
-    val bgFile = remember(settings) { ThemeStore.bgFile(context, settings) }
+    val bgFile = remember(settings) {
+        ThemeStore.bgFile(context, settings)
+    }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
@@ -48,24 +58,42 @@ fun SettingsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, enabled = !isBusy) { Text("← Назад") }
-            Text("Настройки", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            TextButton(onClick = onBack, enabled = !isBusy) {
+                Text("← Назад")
+            }
+            Text(
+                "Настройки",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Column(
-            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Тема оформления", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Тема оформления",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
 
-            if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            if (isBusy) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
 
             val options = listOf(
                 ThemeMode.LIGHT to "Светлая",
                 ThemeMode.DARK to "Тёмная",
                 ThemeMode.CUSTOM to "Своя (фон из галереи)"
             )
-            Card(shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Column {
                     options.forEach { (mode, title) ->
                         Row(
@@ -76,26 +104,43 @@ fun SettingsScreen(
                                     enabled = !isBusy,
                                     role = Role.RadioButton,
                                     onClick = {
-                                        if (mode == ThemeMode.CUSTOM && bgFile == null) {
-                                            // Фото еще не выбирали - сразу открываем галерею
+                                        if (mode == ThemeMode.CUSTOM &&
+                                            bgFile == null
+                                        ) {
+                                            // Фото еще нет - открываем галерею
                                             launchPicker()
                                         } else {
                                             onModeChange(mode)
                                         }
                                     }
                                 )
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(
+                                    horizontal = 16.dp,
+                                    vertical = 12.dp
+                                ),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {RadioButton(selected = settings.mode == mode, onClick = null)
-                            Text(title, style = MaterialTheme.typography.bodyLarge)
+                            horizontalArrangement =
+                                Arrangement.spacedBy(12.dp)
+                        ) {
+                            RadioButton(
+                                selected = settings.mode == mode,
+                                onClick = null
+                            )
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                         }
                     }
                 }
             }
 
             if (bgFile != null) {
-                Text("Фон своей темы", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Фон своей темы",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
                 AsyncImage(
                     model = bgFile,
                     contentDescription = "Фон",

@@ -12,10 +12,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
 
+        <!-- configChanges: при повороте экрана/изменении размера окна активити не пересоздается,
+             поэтому введенные данные и текущий экран не теряются (важно для планшетов) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard"
             tools:ignore="LockedOrientationActivity">
 
             <intent-filter>
