@@ -90,7 +90,6 @@ object ThemeStore {
                 .putBoolean(K_DARK, dark)
                 .putInt(K_ACCENT, avg)
                 .apply()
-
             ThemeSettings(ThemeMode.CUSTOM, newName, dark, avg)
         }
 

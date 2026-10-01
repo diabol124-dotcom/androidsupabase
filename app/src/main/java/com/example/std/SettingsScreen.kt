@@ -87,8 +87,7 @@ fun SettingsScreen(
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            RadioButton(selected = settings.mode == mode, onClick = null)
+                        ) {RadioButton(selected = settings.mode == mode, onClick = null)
                             Text(title, style = MaterialTheme.typography.bodyLarge)
                         }
                     }

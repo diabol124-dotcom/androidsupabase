@@ -282,7 +282,6 @@ fun AddStudentForm(
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
             }
-
             if (isWide) {
                 Row(
                     modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().padding(24.dp),

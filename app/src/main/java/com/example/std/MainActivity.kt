@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
@@ -44,7 +46,11 @@ fun MainScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Экраны: login, register, list, dev, groups, profile (вкладки), form, settings
     var screenState by remember { mutableStateOf("login") }
+    var settingsBackTo by remember { mutableStateOf("list") }
+    var currentUser by remember { mutableStateOf("") }
+
     var students by remember { mutableStateOf<List<StudentItem>>(emptyList()) }
     var groupMap by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -52,6 +58,9 @@ fun MainScreen(
     var isThemeBusy by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var editingStudent by remember { mutableStateOf<StudentItem?>(null) }
+
+    // Широкий экран (планшет): вместо нижней панели - боковая
+    val isWide = LocalConfiguration.current.screenWidthDp >= 720
 
     fun loadData() {
         isLoading = true
@@ -143,15 +152,23 @@ fun MainScreen(
         }
     }
 
-    // Системная кнопка "назад" на формах и в настройках
-    BackHandler(enabled = screenState == "form" || screenState == "settings") {
-        if (screenState == "form") {
-            if (!isSaving) {
+    fun handleLogout() {
+        currentUser = ""
+        students = emptyList()
+        groupMap = emptyMap()
+        editingStudent = null
+        screenState = "login"
+    }
+
+    // Системная кнопка "назад": форма -> список, настройки -> откуда пришли, другие вкладки -> главная
+    BackHandler(enabled = screenState == "form" || screenState == "settings" || (isMainTab(screenState) && screenState != "list")) {
+        when (screenState) {
+            "form" -> if (!isSaving) {
                 editingStudent = null
                 screenState = "list"
             }
-        } else {
-            screenState = "list"
+            "settings" -> screenState = settingsBackTo
+            else -> screenState = "list"
         }
     }
 
@@ -177,65 +194,104 @@ fun MainScreen(
         return
     }
 
-    when (screenState) {
-        "login" -> LoginScreen(
+    when {
+        screenState == "login" -> LoginScreen(
             onNavigateToRegister = { screenState = "register" },
-            onLoginSuccess = {
+            onLoginSuccess = { username ->
+                currentUser = username
                 screenState = "list"
                 loadData()
             }
         )
-        "register" -> RegisterScreen(
+
+        screenState == "register" -> RegisterScreen(
             onNavigateToLogin = { screenState = "login" }
         )
-        "settings" -> SettingsScreen(
+
+        screenState == "settings" -> SettingsScreen(
             settings = themeSettings,
             isBusy = isThemeBusy,
             onModeChange = { handleThemeMode(it) },
             onPickBackground = { handlePickBackground(it) },
-            onBack = { screenState = "list" }
+            onBack = { screenState = settingsBackTo }
         )
-        "list", "form" -> {
-            Scaffold(
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                floatingActionButton = {
-                    if (screenState == "list") {
-                        FloatingActionButton(onClick = {
-                            editingStudent = null
+
+        screenState == "form" -> AddStudentForm(
+            editingStudent = editingStudent,
+            groupMap = groupMap,
+            isSaving = isSaving,
+            onCancel = {
+                editingStudent = null
+                screenState = "list"
+            },
+            onAdd = { insertData, imageUri ->
+                handleSaveStudent(insertData, imageUri)
+            }
+        )
+
+        isMainTab(screenState) -> {
+            // Содержимое выбранной вкладки
+            val tabContent: @Composable () -> Unit = {
+                when (screenState) {
+                    "list" -> StudentList(
+                        students = students,
+                        groupMap = groupMap,
+                        onEditStudent = { student ->
+                            editingStudent = student
                             screenState = "form"
-                        }) {
-                            Text("+", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        },
+                        onDeleteStudent = { id -> handleDeleteStudent(id) },
+                        onOpenSettings = {
+                            settingsBackTo = "list"
+                            screenState = "settings"
                         }
+                    )
+                    "dev" -> DevelopmentScreen()
+                    "groups" -> GroupsScreen(students = students, groupMap = groupMap)
+                    "profile" -> ProfileScreen(
+                        username = currentUser,
+                        studentsCount = students.size,
+                        groupsCount = groupMap.size,
+                        onOpenSettings = {
+                            settingsBackTo = "profile"
+                            screenState = "settings"
+                        },
+                        onLogout = { handleLogout() }
+                    )
+                }
+            }
+
+            val fab: @Composable () -> Unit = {
+                if (screenState == "list") {
+                    FloatingActionButton(onClick = {
+                        editingStudent = null
+                        screenState = "form"
+                    }) {
+                        Text("+", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                     }
                 }
-            ) { padding ->
-                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                    when (screenState) {
-                        "list" -> StudentList(
-                            students = students,
-                            groupMap = groupMap,
-                            onEditStudent = { student ->
-                                editingStudent = student
-                                screenState = "form"
-                            },
-                            onDeleteStudent = { id ->
-                                handleDeleteStudent(id)
-                            },
-                            onOpenSettings = { screenState = "settings" }
-                        )
-                        "form" -> AddStudentForm(
-                            editingStudent = editingStudent,
-                            groupMap = groupMap,
-                            isSaving = isSaving,
-                            onCancel = {
-                                editingStudent = null
-                                screenState = "list"
-                            },
-                            onAdd = { insertData, imageUri ->
-                                handleSaveStudent(insertData, imageUri)
-                            }
-                        )
+            }
+
+            if (isWide) {
+                // Планшет: боковая панель слева
+                Row(modifier = Modifier.fillMaxSize()) {
+                    AppNavigationRail(current = screenState, onSelect = { screenState = it })
+                    Scaffold(
+                        modifier = Modifier.weight(1f),
+                        containerColor = Color.Transparent,
+                        floatingActionButton = fab
+                    ) { padding ->
+                        Box(modifier = Modifier.fillMaxSize().padding(padding)) { tabContent() }
                     }
+                }
+            } else {
+                // Телефон: нижняя панель
+                Scaffold(
+                    containerColor = Color.Transparent,
+                    bottomBar = { AppNavigationBar(current = screenState, onSelect = { screenState = it }) },
+                    floatingActionButton = fab
+                ) { padding ->
+                    Box(modifier = Modifier.fillMaxSize().padding(padding)) { tabContent() }
                 }
             }
         }

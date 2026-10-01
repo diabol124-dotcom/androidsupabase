@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoginScreen(
     onNavigateToRegister: () -> Unit,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: (String) -> Unit
 ) {
     val context = LocalContext.current
     var username by remember { mutableStateOf("") }
@@ -65,7 +65,7 @@ fun LoginScreen(
                     val sharedPref = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                     val savedPassword = sharedPref.getString(username.trim(), null)
                     if (savedPassword != null && savedPassword == password.trim()) {
-                        onLoginSuccess()
+                        onLoginSuccess(username.trim())
                     } else {
                         Toast.makeText(context, "Неверный логин или пароль", Toast.LENGTH_SHORT).show()
                     }
